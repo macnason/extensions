@@ -17,7 +17,8 @@
     "joaopesce",
     "ridemountainpig",
     "GLaDO8",
-    "xmok"
+    "xmok",
+    "macnason"
   ],
   "pastContributors": [
     "sh-cho"
@@ -134,6 +135,14 @@
       "description": "Always use the last selected collection instead of All Bookmarks.",
       "default": false,
       "label": "Use always the last selected collection"
+    },
+    {
+      "name": "aiTaggingEnabled",
+      "type": "checkbox",
+      "label": "Enable AI suggestions (Advanced AI)",
+      "description": "Auto-suggest tags/collection using Raycast AI.",
+      "required": false,
+      "default": false
     },
     {
       "name": "additionalItemToDisplayInList",
