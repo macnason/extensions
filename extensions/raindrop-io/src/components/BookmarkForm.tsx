@@ -1,11 +1,18 @@
-import { Action, ActionPanel, Form, getPreferenceValues, Icon } from "@raycast/api";
+import { Action, ActionPanel, Form, getPreferenceValues, Icon, AI, environment, Toast, showToast } from "@raycast/api";
 import { FormValidation, useCachedState, useForm } from "@raycast/utils";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { FormValues } from "../types";
 
 import { useRequest } from "../hooks/useRequest";
 import { useTags } from "../hooks/useTags";
 import { createCollection, createBookmark, getLinkTitle } from "../helpers/utils";
+import { fetchCollections as apiFetchCollections, fetchTags as apiFetchTags } from "../lib/raindrop-api";
+import { getAiSuggestions } from "../lib/ai-suggestions";
+
+interface Preferences {
+  token: string;
+  aiTaggingEnabled?: boolean;
+}
 
 async function updateBookmark({
   preferences,
@@ -47,6 +54,7 @@ async function updateBookmark({
 type BookmarkFormProps = {
   isLoading?: boolean;
   defaultLink?: string;
+  linkSource?: "browser" | "clipboard";
   onWillSave?: () => void;
   onSaved?: () => void;
   onError?: (error: Error) => void;
@@ -58,13 +66,17 @@ type BookmarkFormProps = {
 export const BookmarkForm = (props: BookmarkFormProps) => {
   const mode = props.bookmarkId ? "edit" : "create";
   const preferences = getPreferenceValues<Preferences>();
+  const { aiTaggingEnabled } = preferences;
   const [collection] = useCachedState("selected-collection", "0");
   const { collections } = useRequest({ collection });
   const { data: tags } = useTags();
   const [dropdownValue, setDropdownValue] = useState(props.defaultValues?.collection ?? "-1");
   const [showCollectionCreation, setShowCollectionCreation] = useState(false);
   const linkRef = useRef<string>(props.defaultValues?.link ?? "");
-  const { handleSubmit, itemProps, setValue, reset, focus } = useForm<FormValues>({
+
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [lastSuggestedUrl, setLastSuggestedUrl] = useState<string | undefined>(undefined);
+  const { handleSubmit, itemProps, setValue, reset, focus, values } = useForm<FormValues>({
     async onSubmit(values) {
       props.onWillSave?.();
 
@@ -114,6 +126,63 @@ export const BookmarkForm = (props: BookmarkFormProps) => {
     },
   });
 
+  const triggerAiSuggestions = useCallback(
+    async (url: string | undefined) => {
+      // Only run AI suggestions in create mode, not edit mode
+      if (mode === "edit") {
+        return;
+      }
+
+      if (!url || url === lastSuggestedUrl || !aiTaggingEnabled || !environment.canAccess(AI) || isAiLoading) {
+        return;
+      }
+      if (!url.match(/^(https?|file):\/\//i)) {
+        return;
+      }
+      if (isAiLoading) return;
+
+      setIsAiLoading(true);
+      let suggestionsApplied = false;
+      try {
+        const [currentTags, currentCollections] = await Promise.all([apiFetchTags(), apiFetchCollections()]);
+        const validCollections = currentCollections.filter((c) => typeof c._id === "number" && !isNaN(c._id));
+
+        if (currentTags.length === 0 && validCollections.length === 0) {
+          console.log("Skipping AI suggestions: No tag/collection context available from API.");
+          return;
+        }
+
+        const suggestions = await getAiSuggestions(url, currentTags, validCollections);
+
+        if (suggestions) {
+          setValue("tags", suggestions.suggestedTags);
+          if (suggestions.suggestedCollectionId !== null) {
+            const suggestedIdStr = suggestions.suggestedCollectionId.toString();
+            const collectionExists = validCollections.some((c) => c._id.toString() === suggestedIdStr);
+            if (collectionExists) {
+              setValue("collection", suggestedIdStr);
+              setDropdownValue(suggestedIdStr);
+            }
+          }
+          suggestionsApplied = true;
+        }
+      } catch (error) {
+        console.error("Error triggering AI suggestions (or fetching context):", error);
+        showToast({
+          style: Toast.Style.Failure,
+          title: "Failed to get AI context",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        setIsAiLoading(false);
+        if (suggestionsApplied) {
+          setLastSuggestedUrl(url);
+        }
+      }
+    },
+    [aiTaggingEnabled, isAiLoading, setValue, lastSuggestedUrl, mode, setDropdownValue],
+  );
+
   useEffect(() => {
     if (props.defaultLink) {
       setValue("link", props.defaultLink);
@@ -128,9 +197,16 @@ export const BookmarkForm = (props: BookmarkFormProps) => {
     }
   }, [props.defaultLink]);
 
+  useEffect(() => {
+    if (!values.link) {
+      setLastSuggestedUrl(undefined);
+    }
+    triggerAiSuggestions(values.link);
+  }, [values.link, triggerAiSuggestions]);
+
   return (
     <Form
-      isLoading={props.isLoading}
+      isLoading={props.isLoading || isAiLoading}
       actions={
         <ActionPanel>
           <Action.SubmitForm
@@ -145,7 +221,13 @@ export const BookmarkForm = (props: BookmarkFormProps) => {
         {...itemProps.link}
         title="Link"
         placeholder="https://example.com"
-        info={mode === "edit" ? undefined : "You can add multiple links separated by commas, spaces, or semicolons."}
+        info={
+          mode === "edit"
+            ? undefined
+            : props.linkSource === "clipboard"
+              ? "📋 URL retrieved from clipboard (browser not supported)"
+              : "You can add multiple links separated by commas, spaces, or semicolons."
+        }
         autoFocus
         onBlur={(event) => {
           const link = event.target.value;

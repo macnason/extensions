@@ -3,12 +3,15 @@ import { BookmarkForm } from "./components/BookmarkForm";
 import { useBrowserLink } from "./hooks/useBrowserLink";
 
 const AddBrowserTab = () => {
-  const { isLoading, data: link } = useBrowserLink();
+  const { isLoading, data: browserLinkData } = useBrowserLink();
+  const link = browserLinkData?.url;
+  const linkSource = browserLinkData?.source;
 
   return (
     <BookmarkForm
       isLoading={isLoading}
       defaultLink={link}
+      linkSource={linkSource}
       onWillSave={() => {
         showToast(Toast.Style.Animated, "Adding Link...");
       }}
