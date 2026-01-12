@@ -19,17 +19,18 @@
     "denis_ufimtsev",
     "sapoepsilon",
     "theherk",
-    "chris_van_es"
+    "chris_van_es",
+    "macnason"
   ],
   "license": "MIT",
   "preferences": [
     {
       "name": "vaultPath",
       "type": "textfield",
-      "placeholder": "path/to/vault",
+      "placeholder": "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Notes",
       "title": "Path to Vault",
       "required": false,
-      "description": "Specify the path or multiple paths (comma separated) to your vault/vaults"
+      "description": "Specify the path or multiple paths (comma separated) to your vault/vaults. Use ~ for home directory (e.g., ~/Documents/MyVault) for cross-device compatibility."
     },
     {
       "name": "configFileName",

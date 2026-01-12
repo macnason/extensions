@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as fsAsync from "fs/promises";
 import { homedir } from "os";
 import path from "path";
+import { expandTildePath } from "../../utils/path";
 import { GlobalPreferences } from "../../utils/preferences";
 import { ObsidianVault } from "./vault";
 
@@ -31,6 +32,7 @@ export function getVaultsFromPreferences(): ObsidianVault[] {
     .split(",")
     .map((vaultPath) => vaultPath.trim())
     .filter((vaultPath) => vaultPath !== "")
+    .map((vaultPath) => expandTildePath(vaultPath))
     .filter((vaultPath) => fs.existsSync(vaultPath))
     .map((vault) => ({
       name: getVaultNameFromPath(vault) ?? "invalid vault name",
