@@ -97,7 +97,9 @@ class AuthenticationError extends Error {
 
 function getApiKey(): string {
   const { apiKey } = getPreferenceValues<Preferences>();
-  return apiKey;
+  // Sanitize API key: trim whitespace and remove non-ASCII characters
+  // This handles copy/paste issues with smart quotes or other unicode
+  return apiKey.trim().replace(/[^\x20-\x7E]/g, "");
 }
 
 async function makeAuthenticatedRequest<T>(
