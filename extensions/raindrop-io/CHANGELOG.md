@@ -18,6 +18,10 @@
 - Added Quick Add Bookmark command for saving URLs instantly without opening a form
 - Automatically fetches page title from URL
 
+## [AI Suggestions] - 2025-12-01
+
+- Added experimental AI-powered suggestions for tags and collections when creating bookmarks (requires Raycast Pro).
+
 ## [AI Assistant] - 2025-11-17
 
 - Added Raycast AI tooling so you can mention `@raindrop-io` in Raycast AI to search, inspect, and summarize bookmarks.

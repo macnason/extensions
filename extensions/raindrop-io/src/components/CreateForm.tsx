@@ -1,8 +1,8 @@
 import { Action, ActionPanel, Form, getPreferenceValues, Icon, AI, environment, Toast, showToast } from "@raycast/api";
-import { FormValidation, useCachedState, useForm } from "@raycast/utils";
+import { useCachedState, useForm } from "@raycast/utils";
 import fetch, { Response } from "node-fetch";
 import { useEffect, useState, useCallback } from "react";
-import { CollectionCreationResponse, FormValues } from "../types";
+import { FormValues, Collection } from "../types";
 
 import { useRequest } from "../hooks/useRequest";
 import { useTags } from "../hooks/useTags";
@@ -11,7 +11,9 @@ import { getLinkTitle } from "../helpers/utils";
 import {
   fetchCollections as apiFetchCollections,
   fetchTags as apiFetchTags,
-  Collection as ApiCollection,
+  createCollectionAPI,
+  createBookmarksAPI,
+  BookmarkCreationData,
 } from "../lib/raindrop-api";
 import { getAiSuggestions } from "../lib/ai-suggestions";
 
@@ -22,67 +24,6 @@ interface Preferences {
   // Add other preferences used in this file if necessary
 }
 
-// Define TagItem interface matching useTags hook structure if possible
-interface TagItem {
-  _id: string;
-  count?: number; // Assuming count might be present from types.ts
-}
-
-async function createCollection({
-  preferences,
-  title,
-}: {
-  preferences: Preferences;
-  title: string;
-}): Promise<CollectionCreationResponse> {
-  const response = await fetch("https://api.raindrop.io/rest/v1/collection", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${preferences.token}`,
-    },
-    body: JSON.stringify({ title, parent: { $id: {} } }),
-  });
-
-  return (await response.json()) as CollectionCreationResponse;
-}
-
-async function createBookmark({
-  preferences,
-  values,
-  showCollectionCreation,
-}: {
-  preferences: Preferences;
-  values: FormValues;
-  showCollectionCreation: boolean;
-}) {
-  let collectionId = values.collection;
-
-  if (showCollectionCreation && values.newCollection) {
-    collectionId = await createCollection({
-      preferences,
-      title: values.newCollection,
-    }).then((data) => data.item._id.toString());
-  }
-
-  return fetch("https://api.raindrop.io/rest/v1/raindrops", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${preferences.token}`,
-    },
-    body: JSON.stringify({
-      items: values.link.split(/[ ,;]/).map((link) => ({
-        link: link.trim(),
-        title: values.title,
-        collectionId,
-        tags: values.tags,
-        pleaseParse: {},
-      })),
-    }),
-  });
-}
-
 type CreateFormProps = {
   isLoading?: boolean;
   defaultLink?: string;
@@ -90,6 +31,7 @@ type CreateFormProps = {
   onCreated?: () => void;
   onError?: (error: Error) => void;
 };
+
 export const CreateForm = (props: CreateFormProps) => {
   const preferences = getPreferenceValues<Preferences>();
   const { aiTaggingEnabled } = preferences;
@@ -103,34 +45,71 @@ export const CreateForm = (props: CreateFormProps) => {
 
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [lastSuggestedUrl, setLastSuggestedUrl] = useState<string | undefined>(undefined);
+  const [newSuggestedTags, setNewSuggestedTags] = useState<string[]>([]);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { handleSubmit, itemProps, setValue, reset, focus, values } = useForm<FormValues>({
     async onSubmit(values: FormValues) {
       props.onWillCreate?.();
+      setIsSubmitting(true);
 
       try {
-        const response = await createBookmark({
-          preferences,
-          values,
-          showCollectionCreation,
-        });
+        let finalCollectionId = values.collection;
 
-        if (response.status === 200) {
-          reset({ link: "", collection: "-1", tags: [] });
-          focus("link");
-          props.onCreated?.();
-        } else {
-          throw new Error(response.statusText);
+        if (showCollectionCreation && values.newCollection) {
+          try {
+            const newCollection = await createCollectionAPI(values.newCollection);
+            finalCollectionId = newCollection._id.toString();
+          } catch (error) {
+            console.error("Failed to create new collection:", error);
+            showToast({
+              style: Toast.Style.Failure,
+              title: "Failed to Create Collection",
+              message: error instanceof Error ? error.message : String(error),
+            });
+            setIsSubmitting(false);
+            return;
+          }
         }
+
+        const itemsToCreate: BookmarkCreationData[] = values.link
+          .split(/[ ,;]/)
+          .map((link) => ({
+            link: link.trim(),
+            title: values.title,
+            collectionId: finalCollectionId,
+            tags: values.tags,
+            pleaseParse: {},
+          }))
+          .filter((item) => item.link);
+
+        if (itemsToCreate.length === 0) {
+          showToast({ style: Toast.Style.Failure, title: "No valid links found" });
+          setIsSubmitting(false);
+          return;
+        }
+
+        const response = await createBookmarksAPI(itemsToCreate);
+
+        console.log("API Response from createBookmarksAPI:", response);
+        reset({ link: "", collection: "-1", tags: [] });
+        focus("link");
+        props.onCreated?.();
       } catch (error) {
+        console.error("Submission Error:", error);
         if (error instanceof Error) {
-          props.onError?.(error);
+          if (!String(error.message).includes("Failed to create collection")) {
+            showToast({ style: Toast.Style.Failure, title: "Error Adding Link(s)", message: error.message });
+          }
         }
+      } finally {
+        setIsSubmitting(false);
       }
     },
     validation: {
       link: (value: string | undefined) => {
-        if (!value) return "The item must't be empty";
+        if (!value) return "The item must not be empty";
         if (!value.match(/^(https?|file):\/\//i)) {
           return "Please enter a valid URL (starting with http://, https://, or file://)";
         }
@@ -168,13 +147,17 @@ export const CreateForm = (props: CreateFormProps) => {
       if (!url.match(/^(https?|file):\/\//i)) {
         return;
       }
-      if (isAiLoading) return;
 
       setIsAiLoading(true);
       let suggestionsApplied = false;
       try {
-        const [currentTags, currentCollections] = await Promise.all([apiFetchTags(), apiFetchCollections()]);
-        const validCollections = currentCollections.filter((c) => typeof c._id === "number" && !isNaN(c._id));
+        const [currentTags, currentCollections]: [string[], Collection[]] = await Promise.all([
+          apiFetchTags(),
+          apiFetchCollections(),
+        ]);
+        const validCollections = currentCollections.filter(
+          (c: Collection) => typeof c._id === "number" && !isNaN(c._id),
+        );
 
         if (currentTags.length === 0 && validCollections.length === 0) {
           console.log("Skipping AI suggestions: No tag/collection context available from API.");
@@ -185,9 +168,15 @@ export const CreateForm = (props: CreateFormProps) => {
 
         if (suggestions) {
           setValue("tags", suggestions.suggestedTags);
+
+          const newlySuggested = suggestions.suggestedTags.filter(
+            (suggestedTag) => !currentTags.includes(suggestedTag),
+          );
+          setNewSuggestedTags(newlySuggested);
+
           if (suggestions.suggestedCollectionId !== null) {
             const suggestedIdStr = suggestions.suggestedCollectionId.toString();
-            const collectionExists = validCollections.some((c) => c._id.toString() === suggestedIdStr);
+            const collectionExists = validCollections.some((c: Collection) => c._id.toString() === suggestedIdStr);
             if (collectionExists) {
               setValue("collection", suggestedIdStr);
               setDropdownValue(suggestedIdStr);
@@ -209,19 +198,38 @@ export const CreateForm = (props: CreateFormProps) => {
         }
       }
     },
-    [aiTaggingEnabled, isAiLoading, setValue, lastSuggestedUrl],
+    [aiTaggingEnabled, isAiLoading, setValue, lastSuggestedUrl, tagsData],
   );
 
   useEffect(() => {
     if (!values.link) {
       setLastSuggestedUrl(undefined);
+      setNewSuggestedTags([]);
     }
     triggerAiSuggestions(values.link);
   }, [values.link, triggerAiSuggestions]);
 
+  // --- Prepare tags for TagPicker ---
+  const existingTagItems = tagsData?.items ?? [];
+  const existingTagIds = existingTagItems.map((t) => t._id);
+  const selectedTagIds = values.tags ?? []; // Tags currently selected in the form
+
+  // Combine existing tags and currently selected tags, ensuring uniqueness
+  const allTagIdsToRender = [...new Set([...existingTagIds, ...selectedTagIds])];
+  // --- End Prepare tags ---
+
+  // Use the Collection type from the hook if it's defined and suitable
+  // Or define a local type matching the hook's return structure
+  interface DropdownCollectionItem {
+    value?: number | string; // Adjust based on useRequest return type
+    label: string;
+    name?: string;
+    cover?: string;
+  }
+
   return (
     <Form
-      isLoading={props.isLoading || isAiLoading}
+      isLoading={props.isLoading || isAiLoading || isSubmitting}
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Add Bookmark" icon={Icon.PlusCircle} onSubmit={handleSubmit} />
@@ -249,7 +257,7 @@ export const CreateForm = (props: CreateFormProps) => {
         <Form.Dropdown.Item key="-2" value="-2" title="Create Collection" icon={Icon.Plus} />
         <Form.Dropdown.Item key="-1" value="-1" title="Unsorted" icon={Icon.Tray} />
         <Form.Dropdown.Section title="Collections">
-          {collections.map(({ value, label, name, cover }) => (
+          {collections.map(({ value, label, name, cover }: DropdownCollectionItem) => (
             <Form.Dropdown.Item
               key={value}
               value={`${value ?? "-1"}`}
@@ -263,7 +271,13 @@ export const CreateForm = (props: CreateFormProps) => {
         <Form.TextField {...itemProps.newCollection} title="New Collection" placeholder="Name" />
       )}
       <Form.TagPicker {...itemProps.tags} title="Tags">
-        {tagsData?.items?.map(({ _id }: TagItem) => <Form.TagPicker.Item key={_id} value={_id} title={_id} />)}
+        {/* Render items based on the combined list */}
+        {allTagIdsToRender.map((tagId) => {
+          // Determine icon: If this tagId is in our state of newly suggested tags, show the icon.
+          const icon = newSuggestedTags.includes(tagId) ? Icon.Stars : undefined;
+
+          return <Form.TagPicker.Item key={tagId} value={tagId} title={tagId} icon={icon} />;
+        })}
       </Form.TagPicker>
     </Form>
   );
