@@ -1,5 +1,5 @@
-import { Member, RawMember } from "../models";
-import { getIconWithFallback } from "../utils";
+import { Member, ObjectLayout, RawMember } from "../models";
+import { getIconWithFallback, getNameWithFallback } from "../utils";
 
 /**
  * Map raw `Member` objects from the API into display-ready data (e.g., icon).
@@ -20,11 +20,11 @@ export async function mapMembers(members: RawMember[]): Promise<Member[]> {
  * @returns The display-ready `Member` object.
  */
 export async function mapMember(member: RawMember): Promise<Member> {
-  const icon = await getIconWithFallback(member.icon, "participant");
+  const icon = await getIconWithFallback(member.icon, ObjectLayout.Participant);
 
   return {
     ...member,
-    name: member.name || "Untitled",
+    name: getNameWithFallback(member.name),
     icon,
   };
 }

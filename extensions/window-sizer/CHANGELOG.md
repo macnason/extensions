@@ -1,47 +1,82 @@
 # Window Sizer Changelog
 
-## [Update] - 2025-04-28
+## [Chore] - 2025-09-30
+- Updated screenshots to macOS Tahoe
 
-- Fix: Screenshots and README
+## [Chore] - 2025-06-03
 
-## [Update] - 2025-04-28
+- Fixed store page styling
 
-- Feature: Maximize Window
-- Feature: Get Current Size
-- Fix: Position of the window when restoring previous size
-- Fix: Toasts when size exceeds the screen
-- Fix: Toast when adding a size identical to the current size
+## [Chore] - 2025-06-03
 
-## [Update] - 2025-04-25
+- Fixed store page styling
 
-- Fixed handling of window size addition when no window is in focus
-- Improved toast notification for Restore Previous Size when no focused window
+## [Chore] - 2025-06-03
 
-## [Update] - 2025-04-25
+- Fixed navigation title for the resize window command
 
-- Added loading state to prevent list flicker during data fetching
-- Improved error handling for AppleScript operations
-- Refactored window info retrieval into a shared utility function
-- Enhanced logging messages for better debugging
-- Fixed window size restoration logic
+## [Refactor Favorite Size Feature] - 2025-05-30
 
-## [Update] - 2025-04-25
+- Refactored the logic for saving and resizing to the favorite window size
+- Removed the Reset Favorite Size command — favorite size is now configured directly in the command settings
+- Renamed the command from "Resize to Favorite Size" to "Apply Favorite Size"
 
-- Improved window positioning logic during resize
-- Enhanced previous window size restoration
+## [New Feature and Improvements] - 2025-05-28
 
-## [Update] - 2025-04-25
+- Added a new command to quickly save and resize to a favorite window size
+- Cleaned up default sizes
 
-- Remove the default size in the add page
-- Fix typo in the add page
+## [Chore] - 2025-05-26
 
-## [Update] - 2025-04-25
+- Cleanup of internal HUD navigation logic
 
-- Fix toast emoji
+## [Fixes] - 2025-05-23
+
+- Fixed occasional issue with action icon not displaying
+
+## [UI improvement] - 2025-05-21
+
+- Adjusted Action icon to only display when selected
+
+## [Starred Sizes & Improvements] - 2025-05-19
+
+- Added starring for frequently used window sizes
+- Unified shortcut keys for Deleting Custom and Starred Sizes
+- Improved action icons
+
+## [New Action Icons] - 2025-05-12
+
+- Added new action icons
+
+## [Fixes] - 2025-05-08
+
+- Fixed the delete icon tooltip text on custom size list items
+
+## [Update Extension Icon] - 2025-05-07
+
+- Updated extension icon and screenshots
+
+## [Fixes] - 2025-05-06
+
+- Fixed toast text when restoring a window with restricted size
+- Unified toast text style
+
+## [Refactored entirely in Swift] - 2025-05-05
+
+- Fully rewrote the extension in Swift for better maintainability and performance
+- Enhanced Maximize Window to support all connected screens
+- Improved screen edge detection to ensure precise window resizing
+- Various performance and UX improvements
+
+## [New Features & Fixes] - 2025-04-28
+
+- Enabled maximizing the active window
+- Added support for displaying the current window size
+- Fixed incorrect positioning when restoring a saved size
+- Improved toast behavior when the size exceeds the screen
+- Suppressed redundant toast when saving the same size again
 
 ## [Initial Version] - 2025-04-25
-
-### Features
 
 - First release of Window Sizer
 - Support for quick window resizing to predefined sizes

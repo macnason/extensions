@@ -1,6 +1,71 @@
 # Anytype Changelog
 
-## [✨ AI Enhancements & Improvements] - 2025-03-XX
+## [Terminology Updates & Enhancements] - 2025-12-15
+
+- Update to API version 2025-11-08
+- Allow updating markdown body of objects
+- Add ability to remove objects from collections
+- Add word and character count display for objects
+- Add tag creation functionality in TagSubmenu component and allow deletion of tags
+- Improve search with client-side and API-side filtering for better offline support
+- Rename "spaces" to "channels" throughout the extension to align with adjusted terminology
+- Improve handling of deleted types with fallback representations
+
+## [Fixes] - 2025-12-04
+
+- Fix quicklink not loading type, space, list, and template correctly when launching create-object command
+
+## [Fixes] - 2025-07-09
+
+- Fix error when creating objects without linked type properties
+- Fix display issues when Note layouts are missing icons
+- Fix draft functionality in CreateObject form
+- Fix form validation in AddToList command
+- Fix string pluralization issues
+
+## [UI Polish, Tag Management & Fixes] - 2025-05-26
+
+- Add context actions to manage tags on objects (add/remove)
+- Improve type indicators across all object lists
+- Support built-in SVG icons for type creation and editing
+- Standardize placeholder text and information messages
+- Update to API version 2025-05-20
+
+## [Properties, Types & Tags] - 2025-05-07
+
+#### New Creation Options
+
+When browsing spaces, press `CMD+N` to create new objects, types, properties or tags.
+
+- Add ability to create new spaces
+- Add ability to create new types
+- Add ability to create new properties
+- Add ability to create new tags
+
+#### Edit Form Enhancements
+
+Use `CMD+E` to quickly edit the currently selected item - whether it's a space, object, type, property, or tag.
+
+- Add support for editing spaces
+- Add support for editing objects
+- Add support for editing types
+- Add support for editing properties
+- Add support for editing tags
+
+#### New Commands & Navigation
+
+- Add new command to add objects to lists
+- Pop back to list view when deleting object, with automatic refresh
+- List properties when browsing space
+- Browse tags for select/multi-select properties
+- Open bookmarks directly in browser
+
+#### Form Improvements
+
+- Allow custom properties (inherited from type) for object creation
+- Improve number and emoji validation logic in create form
+
+## [✨ AI Enhancements & Improvements] - 2025-04-22
 
 #### AI Extension
 

@@ -6,11 +6,16 @@ export interface CreateSpaceRequest {
   description: string;
 }
 
+export interface UpdateSpaceRequest {
+  name?: string;
+  description?: string;
+}
+
 export interface RawSpace {
-  object: string;
+  object: "space" | "chat";
   id: string;
   name: string;
-  icon: ObjectIcon;
+  icon: ObjectIcon | null;
   description: string;
   gateway_url: string;
   network_id: string;

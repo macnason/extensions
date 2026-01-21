@@ -1,42 +1,43 @@
-import { showToast, Toast } from "@raycast/api";
-import { useCachedPromise } from "@raycast/utils";
+import { showFailureToast, useCachedPromise } from "@raycast/utils";
 import { useEffect, useMemo, useState } from "react";
-import { CreateObjectFormValues } from "../create-object";
-import { fetchAllTemplatesForSpace, fetchAllTypesForSpace } from "../utils";
+import { CreateObjectFormValues } from "../components";
+import { bundledTypeKeys, fetchAllTemplatesForSpace, fetchAllTypesForSpace, memberMatchesSearch } from "../utils";
+import { useMembers } from "./useMembers";
 import { useSearch } from "./useSearch";
 import { useSpaces } from "./useSpaces";
 
 export function useCreateObjectData(initialValues?: CreateObjectFormValues) {
-  const [selectedSpace, setSelectedSpace] = useState(initialValues?.space || "");
-  const [selectedType, setSelectedType] = useState(initialValues?.type || "");
-  const [selectedTemplate, setSelectedTemplate] = useState(initialValues?.template || "");
-  const [selectedList, setSelectedList] = useState(initialValues?.list || "");
+  const [selectedSpaceId, setSelectedSpaceId] = useState(initialValues?.spaceId || "");
+  const [selectedTypeId, setSelectedTypeId] = useState(initialValues?.typeId || "");
+  const [selectedTemplateId, setSelectedTemplateId] = useState(initialValues?.templateId || "");
+  const [selectedListId, setSelectedListId] = useState(initialValues?.listId || "");
   const [listSearchText, setListSearchText] = useState("");
+  const [objectSearchText, setObjectSearchText] = useState("");
 
   const { spaces, spacesError, isLoadingSpaces } = useSpaces();
   const {
     objects: lists,
     objectsError: listsError,
     isLoadingObjects: isLoadingLists,
-  } = useSearch(selectedSpace, listSearchText, ["ot-collection"]);
+  } = useSearch(selectedSpaceId, listSearchText, [bundledTypeKeys.collection]);
 
   const restrictedTypes = [
-    "ot-audio",
-    "ot-chat",
-    "ot-file",
-    "ot-image",
-    "ot-objectType",
-    "ot-tag",
-    "ot-template",
-    "ot-video",
-    "ot-participant",
+    bundledTypeKeys.audio,
+    bundledTypeKeys.chat,
+    bundledTypeKeys.file,
+    bundledTypeKeys.image,
+    bundledTypeKeys.object_type,
+    bundledTypeKeys.tag,
+    bundledTypeKeys.template,
+    bundledTypeKeys.video,
+    bundledTypeKeys.participant,
   ];
 
   const {
     data: allTypes,
     error: typesError,
     isLoading: isLoadingTypes,
-  } = useCachedPromise(fetchAllTypesForSpace, [selectedSpace], { execute: !!selectedSpace });
+  } = useCachedPromise(fetchAllTypesForSpace, [selectedSpaceId], { execute: !!selectedSpaceId });
 
   const types = useMemo(() => {
     if (!allTypes) return [];
@@ -47,38 +48,51 @@ export function useCreateObjectData(initialValues?: CreateObjectFormValues) {
     data: templates,
     error: templatesError,
     isLoading: isLoadingTemplates,
-  } = useCachedPromise(fetchAllTemplatesForSpace, [selectedSpace, selectedType], {
-    execute: !!selectedSpace && !!selectedType,
+  } = useCachedPromise(fetchAllTemplatesForSpace, [selectedSpaceId, selectedTypeId], {
+    execute: !!selectedSpaceId && !!selectedTypeId,
     initialData: [],
   });
 
-  useEffect(() => {
-    if (spacesError || typesError || templatesError || listsError) {
-      showToast(
-        Toast.Style.Failure,
-        "Failed to fetch latest data",
-        spacesError?.message || typesError?.message || templatesError?.message || listsError?.message,
-      );
-    }
-  }, [spacesError, typesError, templatesError, listsError]);
+  const { objects, objectsError, isLoadingObjects } = useSearch(selectedSpaceId, objectSearchText, []);
+  const { members, membersError, isLoadingMembers } = useMembers(selectedSpaceId, objectSearchText);
 
-  const isLoading = isLoadingSpaces || isLoadingTypes || isLoadingTemplates || isLoadingLists;
+  const filteredMembers = useMemo(() => {
+    return members.filter((member) => memberMatchesSearch(member, objectSearchText));
+  }, [members, objectSearchText]);
+
+  const combinedObjects = useMemo(() => {
+    return [...(objects || []), ...filteredMembers];
+  }, [objects, filteredMembers]);
+
+  useEffect(() => {
+    if (spacesError || typesError || templatesError || listsError || objectsError || membersError) {
+      showFailureToast(spacesError || typesError || templatesError || listsError || objectsError || membersError, {
+        title: "Failed to fetch latest data",
+      });
+    }
+  }, [spacesError, typesError, templatesError, listsError, objectsError, membersError]);
+
+  const isLoadingData =
+    isLoadingSpaces || isLoadingTypes || isLoadingTemplates || isLoadingLists || isLoadingObjects || isLoadingMembers;
 
   return {
     spaces,
     types,
     templates,
     lists,
-    selectedSpace,
-    setSelectedSpace,
-    selectedType,
-    setSelectedType,
-    selectedTemplate,
-    setSelectedTemplate,
-    selectedList,
-    setSelectedList,
+    objects: combinedObjects,
+    selectedSpaceId,
+    setSelectedSpaceId,
+    selectedTypeId,
+    setSelectedTypeId,
+    selectedTemplateId,
+    setSelectedTemplateId,
+    selectedListId,
+    setSelectedListId,
     listSearchText,
     setListSearchText,
-    isLoading,
+    objectSearchText,
+    setObjectSearchText,
+    isLoadingData,
   };
 }

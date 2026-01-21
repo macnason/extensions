@@ -109,7 +109,7 @@ ${collectionsText}
 4. Respond *only* in JSON format with the following structure:
    {
      "suggestedTags": ["tag1", "tag2"],
-     "suggestedCollectionId": <collection_id> 
+     "suggestedCollectionId": <collection_id>
    }
    If no suitable collection is found, use 'null' for suggestedCollectionId. Ensure the output is valid JSON.
 `;

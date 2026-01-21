@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Form, getPreferenceValues, Icon, Toast, showToast } from "@raycast/api";
+import { Action, ActionPanel, Form, getPreferenceValues, Icon, AI, environment, Toast, showToast } from "@raycast/api";
 import { useCachedState, useForm } from "@raycast/utils";
 import fetch, { Response } from "node-fetch";
 import { useEffect, useState, useCallback } from "react";
@@ -6,6 +6,7 @@ import { FormValues, Collection } from "../types";
 
 import { useRequest } from "../hooks/useRequest";
 import { useTags } from "../hooks/useTags";
+import { getLinkTitle } from "../helpers/utils";
 
 import {
   fetchCollections as apiFetchCollections,
@@ -30,20 +31,6 @@ type CreateFormProps = {
   onCreated?: () => void;
   onError?: (error: Error) => void;
 };
-
-async function getLinkTitle(link: string): Promise<string> {
-  return fetch(link)
-    .then((response: Response) => response.text())
-    .then((html: string) => {
-      const match = html.match(/<title>(.*?)<\/title>/i);
-      const title = match ? match[1] : "";
-      return title;
-    })
-    .catch((error: Error) => {
-      console.error("Error fetching title:", error);
-      return "";
-    });
-}
 
 export const CreateForm = (props: CreateFormProps) => {
   const preferences = getPreferenceValues<Preferences>();
@@ -154,7 +141,7 @@ export const CreateForm = (props: CreateFormProps) => {
 
   const triggerAiSuggestions = useCallback(
     async (url: string | undefined) => {
-      if (!url || url === lastSuggestedUrl || !aiTaggingEnabled || isAiLoading) {
+      if (!url || url === lastSuggestedUrl || !aiTaggingEnabled || !environment.canAccess(AI) || isAiLoading) {
         return;
       }
       if (!url.match(/^(https?|file):\/\//i)) {
@@ -237,6 +224,7 @@ export const CreateForm = (props: CreateFormProps) => {
     value?: number | string; // Adjust based on useRequest return type
     label: string;
     name?: string;
+    cover?: string;
   }
 
   return (
@@ -269,12 +257,12 @@ export const CreateForm = (props: CreateFormProps) => {
         <Form.Dropdown.Item key="-2" value="-2" title="Create Collection" icon={Icon.Plus} />
         <Form.Dropdown.Item key="-1" value="-1" title="Unsorted" icon={Icon.Tray} />
         <Form.Dropdown.Section title="Collections">
-          {collections.map(({ value, label, name }: DropdownCollectionItem) => (
+          {collections.map(({ value, label, name, cover }: DropdownCollectionItem) => (
             <Form.Dropdown.Item
               key={value}
               value={`${value ?? "-1"}`}
               title={name ? `${name} (${label})` : label}
-              icon={Icon.Folder}
+              icon={cover ? { source: cover } : { source: Icon.Folder }}
             />
           ))}
         </Form.Dropdown.Section>
@@ -286,10 +274,8 @@ export const CreateForm = (props: CreateFormProps) => {
         {/* Render items based on the combined list */}
         {allTagIdsToRender.map((tagId) => {
           // Determine icon: If this tagId is in our state of newly suggested tags, show the icon.
-          // Revert back to Icon.Stars
           const icon = newSuggestedTags.includes(tagId) ? Icon.Stars : undefined;
 
-          // Use tagId directly, no need for TagItem interface here
           return <Form.TagPicker.Item key={tagId} value={tagId} title={tagId} icon={icon} />;
         })}
       </Form.TagPicker>

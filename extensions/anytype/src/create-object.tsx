@@ -1,25 +1,12 @@
 import { LaunchProps } from "@raycast/api";
-import { CreateObjectForm, EnsureAuthenticated } from "./components";
-import { useCreateObjectData } from "./hooks";
-
-export interface CreateObjectFormValues {
-  space?: string;
-  type?: string;
-  template?: string;
-  list?: string;
-  name?: string;
-  icon?: string;
-  description?: string;
-  body?: string;
-  source?: string;
-}
+import { CreateObjectForm, CreateObjectFormValues, EnsureAuthenticated } from "./components";
 
 interface LaunchContext {
   defaults: {
-    space: string;
-    type: string;
-    template: string;
-    list: string;
+    spaceId: string;
+    typeId: string;
+    templateId: string;
+    listId: string;
     name: string;
     icon: string;
     description: string;
@@ -28,8 +15,7 @@ interface LaunchContext {
   };
 }
 
-interface CreateObjectProps
-  extends LaunchProps<{ draftValues?: CreateObjectFormValues; launchContext?: LaunchContext }> {}
+type CreateObjectProps = LaunchProps<{ draftValues?: CreateObjectFormValues; launchContext?: LaunchContext }>;
 
 export default function Command(props: CreateObjectProps) {
   return (
@@ -45,43 +31,5 @@ function CreateObject({ draftValues, launchContext }: CreateObjectProps) {
     ...draftValues, // `draftValues` takes precedence
   };
 
-  const {
-    spaces,
-    types,
-    templates,
-    lists,
-    selectedSpace,
-    setSelectedSpace,
-    selectedType,
-    setSelectedType,
-    selectedTemplate,
-    setSelectedTemplate,
-    selectedList,
-    setSelectedList,
-    listSearchText,
-    setListSearchText,
-    isLoading,
-  } = useCreateObjectData(mergedValues);
-
-  return (
-    <CreateObjectForm
-      spaces={spaces}
-      types={types}
-      templates={templates}
-      lists={lists}
-      selectedSpace={selectedSpace}
-      setSelectedSpace={setSelectedSpace}
-      selectedType={selectedType}
-      setSelectedType={setSelectedType}
-      selectedTemplate={selectedTemplate}
-      setSelectedTemplate={setSelectedTemplate}
-      selectedList={selectedList}
-      setSelectedList={setSelectedList}
-      listSearchText={listSearchText}
-      setListSearchText={setListSearchText}
-      isLoading={isLoading}
-      draftValues={mergedValues}
-      enableDrafts={true}
-    />
-  );
+  return <CreateObjectForm draftValues={mergedValues} enableDrafts={true} />;
 }

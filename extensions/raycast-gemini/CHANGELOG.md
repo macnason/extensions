@@ -1,5 +1,23 @@
 # Google Gemini Changelog
 
+## [Maintenance] - {PR_MERGE_DATE}
+
+- 🪟 Add support for Windows platform.
+- ⬆️ Bump all dependencies to the latest.
+
+## [Update Models] - 2025-08-04
+
+- ⬆️ Update Gemini 2.5 series models from preview to production ready versions.
+
+## [Add Safety Settings] - 2025-07-03
+
+- 🛡️ Now users can set their safety filtering options as they need.
+- 🐛 Fix a bug in AI chat
+
+## [New Model] - 2025-05-14
+
+- 🆕 New Model: Gemini 2.5 Pro Preview 0506
+
 ## [New Model] - 2025-04-25
 
 - 🆕 New Model: Gemini 2.5 Flash Experimental

@@ -1,16 +1,30 @@
-import { Color, Detail, getPreferenceValues, showToast, Toast, useNavigation } from "@raycast/api";
+import { Color, Detail, getPreferenceValues, open, useNavigation } from "@raycast/api";
+import { MutatePromise, showFailureToast } from "@raycast/utils";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
+import removeMd from "remove-markdown";
 import { ObjectActions, TemplateList, ViewType } from ".";
-import { useExport, useObject } from "../hooks";
-import { ExportFormat, Property, Space } from "../models";
-import { injectEmojiIntoHeading } from "../utils";
+import { useObject } from "../hooks";
+import {
+  BodyFormat,
+  Member,
+  ObjectLayout,
+  Property,
+  PropertyFormat,
+  PropertyWithValue,
+  Space,
+  SpaceObject,
+  Type,
+} from "../models";
+import { anytypeObjectDeeplink, bundledPropKeys, injectEmojiIntoHeading } from "../utils";
+import { CollectionList } from "./Lists/CollectionList";
 
 type ObjectDetailProps = {
   space: Space;
   objectId: string;
   title: string;
-  layout: string;
+  mutate?: MutatePromise<SpaceObject[] | Type[] | Property[] | Member[]>[];
+  layout: ObjectLayout | undefined;
   viewType: ViewType;
   isGlobalSearch: boolean;
   isPinned: boolean;
@@ -20,6 +34,7 @@ export function ObjectDetail({
   space,
   objectId,
   title,
+  mutate,
   layout,
   viewType,
   isGlobalSearch,
@@ -27,29 +42,24 @@ export function ObjectDetail({
 }: ObjectDetailProps) {
   const { push } = useNavigation();
   const { linkDisplay } = getPreferenceValues();
-  const { object, objectError, isLoadingObject, mutateObject } = useObject(space.id, objectId);
-  const { objectExport, objectExportError, isLoadingObjectExport, mutateObjectExport } = useExport(
-    space.id,
-    objectId,
-    ExportFormat.Markdown,
-  );
+  const { object, objectError, isLoadingObject, mutateObject } = useObject(space.id, objectId, BodyFormat.Markdown);
 
-  const [showDetails, setShowDetails] = useState(true);
+  const [shouldShowSidebar, setShouldShowSidebar] = useState(true);
   const properties = object?.properties || [];
-  const excludedPropertyIds = new Set(["added_date", "last_opened_date", "last_modified_date", "last_modified_by"]);
-  const additionalProperties = properties.filter((property) => !excludedPropertyIds.has(property.id));
+  const excludedPropertyKeys = new Set([
+    bundledPropKeys.addedDate,
+    bundledPropKeys.lastModifiedDate,
+    bundledPropKeys.lastOpenedDate,
+    bundledPropKeys.createdBy,
+    bundledPropKeys.links,
+  ]);
+  const additionalProperties = properties.filter((property) => !excludedPropertyKeys.has(property.key));
 
   useEffect(() => {
     if (objectError) {
-      showToast(Toast.Style.Failure, "Failed to fetch object", objectError.message);
+      showFailureToast(objectError, { title: "Failed to fetch object" });
     }
   }, [objectError]);
-
-  useEffect(() => {
-    if (objectExportError) {
-      showToast(Toast.Style.Failure, "Failed to fetch object as markdown", objectExportError.message);
-    }
-  }, [objectExportError]);
 
   const formatOrder: { [key: string]: number } = {
     text: 0,
@@ -76,35 +86,42 @@ export function ObjectDetail({
     }
 
     // For properties in the 'text' group, ensure that 'description' comes first
-    if (aGroup === "text" && bGroup === "text") {
-      if (a.id === "description" && b.id !== "description") return -1;
-      if (b.id === "description" && a.id !== "description") return 1;
+    if (aGroup === PropertyFormat.Text && bGroup === PropertyFormat.Text) {
+      if (a.key === bundledPropKeys.description && b.key !== bundledPropKeys.description) return -1;
+      if (b.key === bundledPropKeys.description && a.key !== bundledPropKeys.description) return 1;
     }
 
     return a.name.localeCompare(b.name);
   });
 
-  function renderDetailMetadata(property: Property) {
-    const titleText = property.name || property.id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  function renderDetailMetadata(property: PropertyWithValue) {
+    const titleText = property.name || property.key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
-    if (property.format === "text") {
+    if (property.format === PropertyFormat.Text) {
       return (
         <Detail.Metadata.Label
           key={property.id}
           title={titleText}
           text={{
-            value: property.text ? property.text : property.id === "description" ? "No description" : "No text",
+            value: property.text
+              ? property.text
+              : property.key === bundledPropKeys.description
+                ? "No description"
+                : "No text",
             color: property.text ? Color.PrimaryText : Color.SecondaryText,
           }}
           icon={{
-            source: property.id === "description" ? "icons/property/description.svg" : "icons/property/text.svg",
+            source:
+              property.key === bundledPropKeys.description
+                ? "icons/property/description.svg"
+                : "icons/property/text.svg",
             tintColor: { light: "grey", dark: "grey" },
           }}
         />
       );
     }
 
-    if (property.format === "number") {
+    if (property.format === PropertyFormat.Number) {
       return (
         <Detail.Metadata.Label
           key={property.id}
@@ -118,7 +135,7 @@ export function ObjectDetail({
       );
     }
 
-    if (property.format === "select") {
+    if (property.format === PropertyFormat.Select) {
       const tag = property.select;
       if (tag) {
         return (
@@ -138,7 +155,7 @@ export function ObjectDetail({
       }
     }
 
-    if (property.format === "multi_select") {
+    if (property.format === PropertyFormat.MultiSelect) {
       const tags = property.multi_select;
       if (tags && tags.length > 0) {
         return (
@@ -154,13 +171,13 @@ export function ObjectDetail({
             key={property.id}
             title={titleText}
             text={{ value: "No tags", color: Color.SecondaryText }}
-            icon={{ source: "icons/property/multiselect.svg", tintColor: { light: "grey", dark: "grey" } }}
+            icon={{ source: "icons/property/multi_select.svg", tintColor: { light: "grey", dark: "grey" } }}
           />
         );
       }
     }
 
-    if (property.format === "date") {
+    if (property.format === PropertyFormat.Date) {
       return (
         <Detail.Metadata.Label
           key={property.id}
@@ -174,14 +191,23 @@ export function ObjectDetail({
       );
     }
 
-    if (property.format === "file") {
-      const files = property.file;
+    if (property.format === PropertyFormat.Files) {
+      const files = property.files;
       if (files && files.length > 0) {
+        const isTruncated = (property.moreCount || 0) > 0;
         return (
           <Detail.Metadata.TagList key={property.id} title={titleText}>
             {files.map((file) => (
               <Detail.Metadata.TagList.Item key={file.id} text={file.name} icon={file.icon} color="grey" />
             ))}
+            {isTruncated ? (
+              <Detail.Metadata.TagList.Item
+                key={`${property.id}-more`}
+                text={`+${property.moreCount} more (open to see all)`}
+                color="grey"
+                onAction={() => open(anytypeObjectDeeplink(space.id, objectId))}
+              />
+            ) : null}
           </Detail.Metadata.TagList>
         );
       } else {
@@ -190,26 +216,26 @@ export function ObjectDetail({
             key={property.id}
             title={titleText}
             text={{ value: "No files", color: Color.SecondaryText }}
-            icon={{ source: "icons/property/file.svg", tintColor: { light: "grey", dark: "grey" } }}
+            icon={{ source: "icons/property/files.svg", tintColor: { light: "grey", dark: "grey" } }}
           />
         );
       }
     }
 
-    if (property.format === "checkbox") {
+    if (property.format === PropertyFormat.Checkbox) {
       return (
         <Detail.Metadata.Label
           key={property.id}
           title=""
           text={titleText}
           icon={{
-            source: property.checkbox ? "icons/property/checkbox0.svg" : "icons/property/checkbox1.svg",
+            source: property.checkbox ? "icons/property/checkbox1.svg" : "icons/property/checkbox0.svg",
           }}
         />
       );
     }
 
-    if (property.format === "url") {
+    if (property.format === PropertyFormat.Url) {
       if (property.url) {
         if (linkDisplay === "text") {
           return (
@@ -242,7 +268,7 @@ export function ObjectDetail({
       }
     }
 
-    if (property.format === "email") {
+    if (property.format === PropertyFormat.Email) {
       if (property.email) {
         if (linkDisplay === "text") {
           return (
@@ -275,7 +301,7 @@ export function ObjectDetail({
       }
     }
 
-    if (property.format === "phone") {
+    if (property.format === PropertyFormat.Phone) {
       return (
         <Detail.Metadata.Label
           key={property.id}
@@ -289,23 +315,35 @@ export function ObjectDetail({
       );
     }
 
-    if (property.format === "object" && Array.isArray(property.object)) {
-      if (property.object.length > 0) {
+    if (property.format === PropertyFormat.Objects) {
+      if (Array.isArray(property.objects) && property.objects.length > 0) {
+        const isTruncated = (property.moreCount || 0) > 0;
         return (
           <Detail.Metadata.TagList key={property.id} title={titleText}>
-            {property.object.map((objectItem, index) => {
+            {property.objects.map((objectItem, index) => {
               const handleAction = () => {
-                push(
-                  <ObjectDetail
-                    space={space}
-                    objectId={objectItem.id}
-                    title={objectItem.name}
-                    layout={objectItem.layout}
-                    viewType={viewType}
-                    isGlobalSearch={isGlobalSearch}
-                    isPinned={isPinned}
-                  />,
-                );
+                if (objectItem.layout === ObjectLayout.Collection || objectItem.layout === ObjectLayout.Set) {
+                  push(
+                    <CollectionList
+                      space={space}
+                      listId={objectItem.id}
+                      listName={objectItem.name}
+                      listLayout={objectItem.layout}
+                    />,
+                  );
+                } else {
+                  push(
+                    <ObjectDetail
+                      space={space}
+                      objectId={objectItem.id}
+                      title={objectItem.name}
+                      layout={objectItem.layout}
+                      viewType={viewType}
+                      isGlobalSearch={isGlobalSearch}
+                      isPinned={isPinned}
+                    />,
+                  );
+                }
               };
 
               return (
@@ -313,18 +351,35 @@ export function ObjectDetail({
                   key={`${property.id}-${index}`}
                   text={objectItem.name || objectItem.id}
                   icon={objectItem.icon}
-                  onAction={objectItem.layout !== "participant" ? handleAction : undefined}
+                  onAction={objectItem.layout !== ObjectLayout.Participant ? handleAction : undefined}
                 />
               );
             })}
+            {isTruncated ? (
+              <Detail.Metadata.TagList.Item
+                key={`${property.id}-more`}
+                text={`+${property.moreCount} more (open to see all)`}
+                color="grey"
+                onAction={() => open(anytypeObjectDeeplink(space.id, objectId))}
+              />
+            ) : null}
           </Detail.Metadata.TagList>
+        );
+      } else {
+        return (
+          <Detail.Metadata.Label
+            key={property.id}
+            title={titleText}
+            text={{ value: "No objects", color: Color.SecondaryText }}
+            icon={{ source: "icons/property/objects.svg", tintColor: { light: "grey", dark: "grey" } }}
+          />
         );
       }
     }
     return null;
   }
 
-  const renderedDetailComponents: JSX.Element[] = [];
+  const renderedDetailComponents: React.JSX.Element[] = [];
   let previousGroup: string | null = null;
   orderedProperties.forEach((property) => {
     const currentGroup = property.format;
@@ -359,7 +414,7 @@ export function ObjectDetail({
       </Detail.Metadata.TagList>
     );
 
-    const descIndex = renderedDetailComponents.findIndex((el) => el.key === "description");
+    const descIndex = renderedDetailComponents.findIndex((el) => el.key === bundledPropKeys.description);
     if (descIndex >= 0) {
       renderedDetailComponents.splice(descIndex + 1, 0, typeTag);
     } else {
@@ -367,16 +422,25 @@ export function ObjectDetail({
     }
   }
 
-  const markdown = objectExport?.markdown ?? "";
-  const updatedMarkdown = injectEmojiIntoHeading(markdown, object?.icon);
+  const markdown = object?.markdown ?? "";
+  const updatedMarkdown = injectEmojiIntoHeading(markdown, object?.icon, object?.name, object?.layout);
+
+  if (!isLoadingObject && object && typeof object.markdown === "string") {
+    const plainText = removeMd(markdown);
+    const wordCount = plainText.trim() ? plainText.trim().split(/\s+/).length : 0;
+    const charCount = plainText.replace(/\s+/g, "").length;
+    renderedDetailComponents.push(<Detail.Metadata.Separator />);
+    renderedDetailComponents.push(<Detail.Metadata.Label title="Word Count" text={String(wordCount)} />);
+    renderedDetailComponents.push(<Detail.Metadata.Label title="Character Count" text={String(charCount)} />);
+  }
 
   return (
     <Detail
       markdown={updatedMarkdown}
-      isLoading={isLoadingObject || isLoadingObjectExport}
+      isLoading={isLoadingObject}
       navigationTitle={!isGlobalSearch ? `Browse ${space.name}` : undefined}
       metadata={
-        showDetails && renderedDetailComponents.length > 0 ? (
+        shouldShowSidebar && renderedDetailComponents.length > 0 ? (
           <Detail.Metadata>{renderedDetailComponents}</Detail.Metadata>
         ) : undefined
       }
@@ -385,16 +449,17 @@ export function ObjectDetail({
           space={space}
           objectId={objectId}
           title={title}
+          mutate={mutate}
           mutateObject={mutateObject}
-          mutateExport={mutateObjectExport}
-          objectExport={objectExport}
           layout={layout}
+          object={object}
           viewType={viewType}
           isGlobalSearch={isGlobalSearch}
           isNoPinView={false}
           isPinned={isPinned}
-          showDetails={showDetails}
-          onToggleDetails={() => setShowDetails((prev) => !prev)}
+          isDetailView={true}
+          shouldShowSidebar={shouldShowSidebar}
+          onToggleSidebar={() => setShouldShowSidebar((prev) => !prev)}
         />
       }
     />
