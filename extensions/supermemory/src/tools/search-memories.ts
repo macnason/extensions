@@ -16,8 +16,16 @@ type Input = {
 };
 
 export default async function tool(input: Input) {
+  if (!input.query || input.query.trim() === "") {
+    return {
+      message: "Please provide a search query. What would you like to find?",
+      results: [],
+      total: 0,
+    };
+  }
+
   const response = await searchMemoriesForTool({
-    q: input.query,
+    q: input.query.trim(),
     containerTags: input.project ? [input.project] : undefined,
     limit: input.limit ?? 10,
   });
