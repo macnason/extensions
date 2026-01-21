@@ -1,0 +1,69 @@
+instructions: |
+  You are a personal knowledge assistant powered by Supermemory.
+
+  Core Behaviors:
+  - Always call search-memories before answering questions about stored knowledge
+  - When saving new memories, suggest organizing them into projects
+  - Use list-projects to show available projects before asking which to use
+  - Display memory titles and relevance scores when presenting search results
+
+  Memory Management:
+  - For saving: Accept text, notes, URLs, or any content the user wants to remember
+  - For searching: Use natural language queries (semantic search)
+  - For organizing: Projects (containerTags) group related memories together
+
+  Best Practices:
+  - Summarize search results concisely
+  - When multiple memories match, order by relevance score
+  - If no memories match a query, suggest saving new information
+  - Never delete memories without explicit user confirmation
+  - Use get-memory to retrieve full details when a user asks about a specific memory
+  - Use get-profile to provide personalized context when relevant
+
+evals:
+  - input: "@supermemory remember my favorite color is blue"
+    expected:
+      - callsTool:
+          name: save-memory
+          arguments:
+            content:
+              includes: "favorite color is blue"
+
+  - input: "@supermemory what do I know about React?"
+    expected:
+      - callsTool:
+          name: search-memories
+          arguments:
+            query:
+              includes: "React"
+
+  - input: "@supermemory show me my projects"
+    expected:
+      - callsTool: list-projects
+
+  - input: "@supermemory delete the note about old API"
+    expected:
+      - callsTool:
+          name: search-memories
+      - callsTool:
+          name: delete-memory
+
+  - input: "@supermemory create a project called Work Notes"
+    expected:
+      - callsTool:
+          name: create-project
+          arguments:
+            name:
+              includes: "Work Notes"
+
+  - input: "@supermemory tell me about myself"
+    expected:
+      - callsTool: get-profile
+
+  - input: "@supermemory save this article about TypeScript best practices"
+    expected:
+      - callsTool:
+          name: save-memory
+          arguments:
+            content:
+              includes: "TypeScript"

@@ -16,6 +16,22 @@ export interface Memory {
   createdAt: string;
 }
 
+export interface MemoryDetails {
+  id: string;
+  title?: string;
+  content?: string;
+  url?: string;
+  type: string;
+  containerTag?: string;
+  metadata?: Record<string, unknown>;
+  chunks?: Array<{
+    content: string;
+    metadata?: Record<string, unknown>;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SearchResult {
   documentId: string;
   chunks: unknown[];
@@ -35,11 +51,11 @@ export interface AddMemoryRequest {
   metadata?: Record<string, unknown>;
 }
 
-interface RemoveMemoryRequest {
+export interface RemoveMemoryRequest {
   id: string;
 }
 
-interface AddProjectRequest {
+export interface AddProjectRequest {
   name: string;
 }
 
@@ -53,6 +69,11 @@ export interface SearchResponse {
   results: SearchResult[];
   timing: number;
   total: number;
+}
+
+export interface ProfileResponse {
+  profile: string;
+  memories?: SearchResult[];
 }
 
 const API_BASE_URL = "https://api.supermemory.ai";
@@ -252,5 +273,97 @@ export async function searchMemories(
 // Helper function to check if API key is configured and valid
 export async function fetchSettings(): Promise<object> {
   const response = await makeAuthenticatedRequest<object>("/v3/settings");
+  return response;
+}
+
+// ============================================================================
+// Tool-friendly API functions (no Toast dependencies)
+// These are designed for use in AI tools where we don't want UI side effects
+// ============================================================================
+
+/**
+ * Search memories using semantic search (tool-friendly version)
+ */
+export async function searchMemoriesForTool(
+  request: SearchRequest,
+): Promise<SearchResponse> {
+  const response = await makeAuthenticatedRequest<SearchResponse>(
+    "/v3/search",
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
+  );
+  return response;
+}
+
+/**
+ * Get a specific memory by ID (tool-friendly)
+ */
+export async function getMemoryById(id: string): Promise<MemoryDetails> {
+  const response = await makeAuthenticatedRequest<MemoryDetails>(
+    `/v3/documents/${id}`,
+  );
+  return response;
+}
+
+/**
+ * Add a new memory (tool-friendly version)
+ */
+export async function addMemoryForTool(
+  request: AddMemoryRequest,
+): Promise<Memory> {
+  const response = await makeAuthenticatedRequest<Memory>("/v3/documents", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+  return response;
+}
+
+/**
+ * Delete a memory by ID (tool-friendly version)
+ */
+export async function deleteMemoryForTool(id: string): Promise<void> {
+  await makeAuthenticatedRequest(`/v3/documents/${id}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * List all projects (tool-friendly version)
+ */
+export async function listProjectsForTool(): Promise<Project[]> {
+  const response = await makeAuthenticatedRequest<{ projects: Project[] }>(
+    "/v3/projects",
+  );
+  return response.projects || [];
+}
+
+/**
+ * Create a new project (tool-friendly version)
+ */
+export async function createProjectForTool(name: string): Promise<Project> {
+  const response = await makeAuthenticatedRequest<Project>("/v3/projects", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  return response;
+}
+
+/**
+ * Get user profile with optional context query
+ */
+export async function getProfile(query?: string): Promise<ProfileResponse> {
+  const body: Record<string, unknown> = {};
+  if (query) {
+    body.q = query;
+  }
+  const response = await makeAuthenticatedRequest<ProfileResponse>(
+    "/v4/profile",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
   return response;
 }

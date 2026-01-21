@@ -40,6 +40,46 @@
       "mode": "view"
     }
   ],
+  "tools": [
+    {
+      "name": "save-memory",
+      "title": "Save Memory",
+      "description": "Save text, URLs, or notes to your Supermemory knowledge base"
+    },
+    {
+      "name": "search-memories",
+      "title": "Search Memories",
+      "description": "Search through memories using semantic search"
+    },
+    {
+      "name": "get-memory",
+      "title": "Get Memory Details",
+      "description": "Retrieve full details of a specific memory by ID"
+    },
+    {
+      "name": "delete-memory",
+      "title": "Delete Memory",
+      "description": "Remove a memory from your knowledge base"
+    },
+    {
+      "name": "list-projects",
+      "title": "List Projects",
+      "description": "List all projects for organizing memories"
+    },
+    {
+      "name": "create-project",
+      "title": "Create Project",
+      "description": "Create a new project to organize memories"
+    },
+    {
+      "name": "get-profile",
+      "title": "Get Profile",
+      "description": "Get your profile summary with memory context"
+    }
+  ],
+  "ai": {
+    "instructions": "Use search-memories before answering questions about stored knowledge. When saving new memories, suggest organizing them into projects using list-projects first. Display memory titles and relevance scores when presenting results. Never delete memories without explicit user confirmation."
+  },
   "preferences": [
     {
       "name": "apiKey",
