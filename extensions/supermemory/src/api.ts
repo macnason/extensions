@@ -130,13 +130,20 @@ async function makeAuthenticatedRequest<T>(
       let errorMessage = `API request failed: ${response.statusText}`;
       try {
         const errorBody = (await response.json()) as {
-          message?: string;
-          error?: string;
+          message?: string | object;
+          error?: string | object;
+          errors?: object[];
+        };
+        const extractMessage = (value: string | object | object[]): string => {
+          if (typeof value === "string") return value;
+          return JSON.stringify(value);
         };
         if (errorBody.message) {
-          errorMessage = errorBody.message;
+          errorMessage = extractMessage(errorBody.message);
         } else if (errorBody.error) {
-          errorMessage = errorBody.error;
+          errorMessage = extractMessage(errorBody.error);
+        } else if (errorBody.errors) {
+          errorMessage = extractMessage(errorBody.errors);
         }
       } catch {
         // Ignore JSON parsing errors, use default message
